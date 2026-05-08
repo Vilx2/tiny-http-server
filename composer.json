@@ -1,6 +1,7 @@
 {
   "name": "vilx2/tiny-http-server",
-  "description": "A short description of what your package does",
+  "description": "A minimalistic, embedded, near-zero-dependency HTTP server",
+  "keywords": ["http", "http server", "embedded", "zero dependency"],
   "license": "MIT",
   "require": {
     "php": ">=8.1",
