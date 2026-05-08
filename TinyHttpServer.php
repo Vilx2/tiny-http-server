@@ -1,6 +1,9 @@
 <?php
 namespace Vilx2;
 
+use Exception;
+use Throwable;
+
 /**
  * A trivial, minimalistic HTTP server that can be used alongside other code for diagnostic purposes.
  */
@@ -41,7 +44,7 @@ class TinyHttpServer
 
         $this->listenSocket = stream_socket_server("tcp://{$this->ip}:{$this->port}", $errno, $errstr) ?: null;
         if (!$this->listenSocket) {
-            throw new \Exception($errstr, $errno);
+            throw new Exception($errstr, $errno);
         }
         stream_set_blocking($this->listenSocket, false);
     }
@@ -55,7 +58,7 @@ class TinyHttpServer
      *      The function will return as soon as this much time has elapsed, even if it still has things it could do.
      *      A small overshoot is still possible, and also if the callback function takes forever, then all bets are off.
      *      If 0, the function will return after 1 round of processing, however long that takes.
-     *      If null, the function will return after the minimum time has elapsed and it has run out of things to do.
+     *      If null, the function will return after the minimum time has elapsed, and it has run out of things to do.
      *      Negative values are treated as 0. If $max_time < $min_time, the result is unpredictable.
      */
     public function process(float $min_time = 0, ?float $max_time = null): void
@@ -86,7 +89,7 @@ class TinyHttpServer
 
             $result = stream_select($read_sockets, $write_sockets, $except_sockets, floor($waitTime / 1_000_000_000), floor(($waitTime % 1_000_000_000) / 1000));
             if ($result === false) {
-                throw new \Exception("Error selecting active streams!");
+                throw new Exception("Error selecting active streams!");
             }
             if ($result == 0) {
                 return;
@@ -96,7 +99,7 @@ class TinyHttpServer
                 if ($idx === 'listen') {
                     $new_socket = stream_socket_accept($socket, 0, $peer_name);
                     if ( $new_socket === false ) {
-                        throw new \Exception("Error accepting incoming socket!");
+                        throw new Exception("Error accepting incoming socket!");
                     }
                     stream_set_blocking($new_socket, false);
                     stream_set_read_buffer($new_socket, 0);
@@ -182,7 +185,7 @@ class TinyHttpServerSocket
         $this->handler = $handler;
     }
 
-    public function notifyDataRead()
+    public function notifyDataRead(): bool
     {
         do {
             $startingState = $this->internalState;
@@ -206,14 +209,14 @@ class TinyHttpServerSocket
         return false;
     }
 
-    public function notifyDataWritten()
+    public function notifyDataWritten(): void
     {
         if ($this->internalState == self::INTERNAL_STATE_SEND_RESPONSE) {
             $this->finished = true;
         }
     }
 
-    private function parseHeaders()
+    private function parseHeaders(): void
     {
         $headerEnd = strpos($this->readBuffer, "\r\n\r\n");
         if ($headerEnd === false) {
@@ -254,7 +257,7 @@ class TinyHttpServerSocket
         }
     }
 
-    private function parseBodyLength()
+    private function parseBodyLength(): void
     {
         $bufLen = strlen($this->readBuffer);
         if ($bufLen < $this->bodyLength) {
@@ -270,7 +273,7 @@ class TinyHttpServerSocket
         $this->internalState = self::INTERNAL_STATE_HANDLE;
     }
 
-    private function parseBodyChunk()
+    private function parseBodyChunk(): void
     {
         while (true) {
             $p = strpos($this->readBuffer, "\r\n");
@@ -300,7 +303,7 @@ class TinyHttpServerSocket
         }
     }
 
-    private function handle()
+    private function handle(): void
     {
         if (!isset($this->request->headers[''])) {
             $this->writeBuffer = "HTTP/1.1 400 Bad Request";
@@ -320,7 +323,7 @@ class TinyHttpServerSocket
 
         try {
             ($this->handler)($this->request, $this->response);
-        } catch (\Throwable $ex) {
+        } catch (Throwable $ex) {
             $this->response->setHttpStatus(500);
             $this->response->headers['Content-Type'] = ['text/plain'];
             $this->response->body = $ex->__toString();
@@ -357,7 +360,7 @@ class TinyHttpServerResponse
     public array $headers = [];
     public ?string $body = null;
 
-    public function setHttpStatus(int $statusCode) {
+    public function setHttpStatus(int $statusCode): void {
         $knownCodes = [
             100 => 'Continue',
             101 => 'Switching Protocols',
